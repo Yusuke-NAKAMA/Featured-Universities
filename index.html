@@ -2,36 +2,40 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>University Cards</title>
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
 <style>
+  :root { --gap: 20px; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: 'Orbitron', sans-serif; background: #fff; }
 
-  .slider-container {
-    position: relative;
-    width: 90%;              /* 画面より少し狭め */
-    margin: 0 auto;          /* 中央寄せ */
-    overflow: hidden;
-    padding: 40px 0;
+  /* 埋め込み幅いっぱいにフィット */
+  .cards-wrap {
+    width: 100%;
+    margin: 0;
     background: #fff;
   }
 
-  .slider {
-    display: flex;
-    gap: 20px;
-    animation: scroll 30s linear infinite; /* ゆっくり流れる */
+  /* PC：5枚を等幅でぴったり収める（はみ出し防止） */
+  .cards-container {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: var(--gap);
+    width: 100%;
+    padding: 0; /* 左右の余白が原因で切れないようゼロに */
+    overflow: hidden; /* はみ出し防止 */
   }
 
   .card {
     position: relative;
-    flex: 0 0 calc(25% - 20px); /* 4枚きっちり + 余白 */
+    width: 100%;
     border-radius: 12px;
     overflow: hidden;
-    min-width: 250px;
-    cursor: pointer;
+    /* PCでは幅優先で縮むため min-width は付けない */
     box-shadow: 0 6px 20px rgba(0,0,0,0.2);
     background: #000;
+    cursor: pointer;
   }
 
   .card img {
@@ -44,8 +48,8 @@
   .card-text {
     position: absolute;
     bottom: 20px;
-    left: 15px;
-    color: white;
+    left: 10px;
+    color: #fff;
     text-shadow: 0 3px 6px rgba(0,0,0,0.8);
   }
 
@@ -55,88 +59,118 @@
   }
 
   .card-text p {
-    font-size: 0.9rem;
+    font-size: 0.7rem;
   }
 
-  .arrow {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    font-size: 2rem;
-    color: white;
-    background: rgba(0,0,0,0.4);
-    border: none;
-    padding: 10px;
-    cursor: pointer;
-    z-index: 10;
-    border-radius: 50%;
+  /* --- スマホ版（768px以下）--- */
+  @media (max-width: 768px) {
+    .cards-container {
+      display: flex;                 /* 横並びに切り替え */
+      overflow-x: auto;              /* 横スクロール（スワイプ） */
+      scroll-snap-type: x mandatory; /* スナップ */
+      -webkit-overflow-scrolling: touch;
+      gap: 0;                        /* 余白はスナップに不要 */
+    }
+
+    .card {
+      flex: 0 0 100%;                /* 1画面に1枚ぴったり */
+      height: 100vh;                 /* 画面いっぱいの高さ */
+      border-radius: 0;
+      box-shadow: none;
+      scroll-snap-align: center;
+    }
+
+    .card img {
+      height: 100%;
+      object-fit: cover;
+    }
+
+    /* 5等分インジケーターバー（スマホのみ表示） */
+    .indicator {
+      position: fixed;
+      bottom: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 4px;
+      z-index: 10;
+    }
+    .indicator div {
+      width: 30px;
+      height: 4px;
+      background: #ccc;
+      border-radius: 2px;
+    }
+    .indicator div.active {
+      background: #333;
+    }
   }
 
-  .arrow:hover {
-    background: rgba(0,0,0,0.7);
-  }
-
-  .arrow.left { left: 10px; }
-  .arrow.right { right: 10px; }
-
-  @keyframes scroll {
-    0%   { transform: translateX(0); }
-    100% { transform: translateX(-50%); } /* 半分流れたらループ */
-  }
+  /* PCではインジケータ非表示 */
+  .indicator { display: none; }
 </style>
 </head>
 <body>
 
-<div class="slider-container">
-  <button class="arrow left">&#10094;</button>
-  <div class="slider" id="slider"></div>
-  <button class="arrow right">&#10095;</button>
+<div class="cards-wrap">
+  <div class="cards-container" id="cards"></div>
+  <div class="indicator" id="indicator"></div>
 </div>
 
 <script>
 const universities = [
   {name: "復旦大学", catchcopy: "復旦にある大学", img: "https://yusuke-nakama.github.io/University-Search/Fudan.jpg", url: "#"},
   {name: "香港大学", catchcopy: "香港にある大学", img: "https://yusuke-nakama.github.io/University-Search/HKU.jpg", url: "#"},
-  {name: "高麗大学校（Korea University）",catchcopy: "韓国の大学",img: "https://yusuke-nakama.github.io/University-Search/Korea.jpg", url: "#"},
+  {name: "高麗大学校",catchcopy: "韓国の大学",img: "https://yusuke-nakama.github.io/University-Search/Korea.jpg", url: "#"},
   {name: "ソウル大学校", catchcopy: "ソウルにある大学", img: "https://yusuke-nakama.github.io/University-Search/SNU.jpg", url: "#"},
-  {name: "浦項工科大学校（POSTECH）",catchcopy: "浦項にある大学", img: "https://yusuke-nakama.github.io/University-Search/POSTECH.jpg", url: "#"},
+  {name: "浦項工科大学校",catchcopy: "浦項にある大学", img: "https://yusuke-nakama.github.io/University-Search/POSTECH.jpg", url: "#"},
 ];
 
-// シャッフル関数
-function shuffle(array) {
-  return array.sort(() => Math.random() - 0.5);
+/* Fisher–Yates でしっかりランダム */
+function shuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    const j = Math.floor(Math.random()*(i+1));
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
 }
 
-const slider = document.getElementById('slider');
-let items = shuffle([...universities]);
-items = items.concat(items); // 無限ループのため複製
+/* ランダムに5件取得（元配列が5未満ならそのまま） */
+const picked = shuffle(universities).slice(0, 5);
 
-items.forEach(u => {
+const container = document.getElementById('cards');
+picked.forEach(u => {
   const card = document.createElement('div');
   card.className = 'card';
+  const copy = u.catchcopy ?? u['catch copy'] ?? '';
   card.innerHTML = `
-    <a href="${u.url}" target="_blank">
+    <a href="${u.url}" target="_blank" rel="noopener">
       <img src="${u.img}" alt="${u.name}">
       <div class="card-text">
         <h2>${u.name}</h2>
-        <p>${u.catchcopy}</p>
+        <p>${copy}</p>
       </div>
     </a>`;
-  slider.appendChild(card);
+  container.appendChild(card);
 });
 
-// ←→ ボタン操作
-document.querySelector('.arrow.left').addEventListener('click', () => {
-  slider.style.animationPlayState = 'paused';
-  slider.scrollBy({left: -300, behavior: 'smooth'});
-});
+/* スマホ：インジケータ（5等分バー） */
+const indicator = document.getElementById('indicator');
+if (window.matchMedia('(max-width: 768px)').matches && indicator) {
+  picked.forEach((_, i) => {
+    const seg = document.createElement('div');
+    if (i === 0) seg.classList.add('active');
+    indicator.appendChild(seg);
+  });
 
-document.querySelector('.arrow.right').addEventListener('click', () => {
-  slider.style.animationPlayState = 'paused';
-  slider.scrollBy({left: 300, behavior: 'smooth'});
-});
+  const segs = indicator.querySelectorAll('div');
+  container.addEventListener('scroll', () => {
+    const index = Math.round(container.scrollLeft / container.clientWidth);
+    segs.forEach((s, i) => s.classList.toggle('active', i === index));
+  }, { passive: true });
+}
 </script>
 
 </body>
 </html>
-
